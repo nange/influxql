@@ -281,6 +281,7 @@ func (*Target) node()          {}
 func (*TimeLiteral) node()     {}
 func (*VarRef) node()          {}
 func (*Wildcard) node()        {}
+func (*ListValExpr) node()     {}
 
 // Query represents a collection of ordered statements.
 type Query struct {
@@ -407,6 +408,7 @@ func (*StringLiteral) expr()   {}
 func (*TimeLiteral) expr()     {}
 func (*VarRef) expr()          {}
 func (*Wildcard) expr()        {}
+func (*ListValExpr) expr()     {}
 
 // Literal represents a static literal.
 type Literal interface {
@@ -1471,6 +1473,42 @@ func (s *SelectStatement) RewriteRegexConditions() {
 	if cond, ok := s.Condition.(*ParenExpr); ok {
 		s.Condition = cond.Expr
 	}
+}
+
+// RewriteIn2OrConditions rewrites IN conditions to OR
+// This method assumes all validation has passed.
+func (s *SelectStatement) RewriteIn2OrConditions() {
+	s.Condition = RewriteExpr(s.Condition, func(e Expr) Expr {
+		be, ok := e.(*BinaryExpr)
+		if !ok || be.Op != IN {
+			// This expression is not a binary condition or is not a IN condition
+			return e
+		}
+		ret := &ParenExpr{}
+
+		vals := be.RHS.(*ListValExpr)
+		root := &BinaryExpr{
+			Op:  EQ,
+			LHS: be.LHS,
+			RHS: vals.Vals[0],
+		}
+		if len(vals.Vals) > 1 {
+			for i := 1; i < len(vals.Vals); i++ {
+				root = &BinaryExpr{
+					Op:  OR,
+					LHS: root,
+					RHS: &BinaryExpr{
+						Op:  EQ,
+						LHS: be.LHS,
+						RHS: vals.Vals[i],
+					},
+				}
+			}
+		}
+		ret.Expr = root
+
+		return ret
+	})
 }
 
 // matchExactRegex matches regexes into literals if possible. This will match the
@@ -3605,6 +3643,23 @@ func (s *ListLiteral) String() string {
 	return buf.String()
 }
 
+type ListValExpr struct {
+	Vals []Expr
+}
+
+func (s *ListValExpr) String() string {
+	var buf strings.Builder
+	_, _ = buf.WriteString("(")
+	for idx, val := range s.Vals {
+		if idx != 0 {
+			_, _ = buf.WriteString(", ")
+		}
+		_, _ = buf.WriteString(val.String())
+	}
+	_, _ = buf.WriteString(")")
+	return buf.String()
+}
+
 // StringLiteral represents a string literal.
 type StringLiteral struct {
 	Val string
@@ -3806,6 +3861,12 @@ func CloneExpr(expr Expr) Expr {
 		return &VarRef{Val: expr.Val, Type: expr.Type}
 	case *Wildcard:
 		return &Wildcard{Type: expr.Type}
+	case *ListValExpr:
+		l := &ListValExpr{}
+		for _, val := range expr.Vals {
+			l.Vals = append(l.Vals, CloneExpr(val))
+		}
+		return l
 	}
 	panic("unreachable")
 }
