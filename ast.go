@@ -3861,6 +3861,12 @@ func CloneExpr(expr Expr) Expr {
 		return &VarRef{Val: expr.Val, Type: expr.Type}
 	case *Wildcard:
 		return &Wildcard{Type: expr.Type}
+	case *ListValExpr:
+		l := &ListValExpr{}
+		for _, val := range expr.Vals {
+			l.Vals = append(l.Vals, CloneExpr(val))
+		}
+		return l
 	}
 	panic("unreachable")
 }

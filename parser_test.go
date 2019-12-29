@@ -294,6 +294,10 @@ func TestParser_ParseInQuery(t *testing.T) {
 		if !reflect.DeepEqual(cond, test.condition) {
 			t.Fatalf("parsed condition not eq expected condition, cond:%+v, test.condition:%+v", *cond, *test.condition)
 		}
+		clonedCond := influxql.CloneExpr(cond)
+		if !reflect.DeepEqual(clonedCond, test.condition) {
+			t.Fatalf("cloned condition not eq expected condition, cond:%+v, test.condition:%+v", clonedCond, *test.condition)
+		}
 	}
 
 }
