@@ -41,6 +41,8 @@ func TestScanner_Scan(t *testing.T) {
 		{s: `and`, tok: influxql.AND},
 		{s: `OR`, tok: influxql.OR},
 		{s: `or`, tok: influxql.OR},
+		{s: `IN`, tok: influxql.IN},
+		{s: `in`, tok: influxql.IN},
 
 		{s: `=`, tok: influxql.EQ},
 		{s: `<>`, tok: influxql.NEQ},
